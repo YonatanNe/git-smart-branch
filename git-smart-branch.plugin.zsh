@@ -7,12 +7,26 @@ function git-smart-branch() {
     return 1
   fi
 
-  # Pull model if not available
-  if ! ollama list | grep -q "^$model"; then
-    echo "📦 Pulling $model model..."
-    ollama pull $model || { echo "❌ Failed to pull $model."; return 1; }
+  # Check if Ollama is running
+  local ollama_pid=$(pgrep -f "ollama serve")
+
+  if [[ -z "$ollama_pid" ]]; then
+    echo "🟢 Starting Ollama server in background..."
+    nohup ollama serve > /dev/null 2>&1 &
+    disown
+    sleep 2  # Give it a moment to initialize
   fi
 
+  # Pull model if needed
+  if ! ollama list | grep -q "^$model"; then
+    echo "📦 Pulling $model model..."
+    if ! ollama pull $model; then
+      echo "❌ Failed to pull model: $model"
+      return 1
+    fi
+  fi
+
+  # Construct prompt
   local full_prompt="Based on the following staged git diff, suggest a short, descriptive git branch name.
 
 Use kebab-case and include conventional prefixes like: feature/, fix/, chore/.
